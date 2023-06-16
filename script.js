@@ -6,38 +6,27 @@ function renderTableData(data) {
     const table = document.getElementById('networkStatusTable');
     // Clear out any old rows
     table.innerHTML = '';
+    let fields = ['Interface', 'Flags', 'Options', 'MTU', 'Ether', 'Inet', 'Netmask', 'Broadcast', 'Media'];
     data.forEach((row, index) => {
         if (row.Interface) {
             const newRow = table.insertRow(-1);
-            const cell1 = newRow.insertCell(0);
-            const cell2 = newRow.insertCell(1);
-            const cell3 = newRow.insertCell(2);
-            const cell4 = newRow.insertCell(3);
-            const cell5 = newRow.insertCell(4);
-            const cell6 = newRow.insertCell(5);
-            const cell7 = newRow.insertCell(6);
-            const cell8 = newRow.insertCell(7);
-            const cell9 = newRow.insertCell(8);
-            cell1.innerHTML = row.Interface;
-            cell2.innerHTML = row.Flags;
-            cell3.innerHTML = row.Options;
-            cell4.innerHTML = row.MTU;
-            cell5.innerHTML = row.Ether;
-            cell6.innerHTML = row.Inet || '';
-            cell7.innerHTML = row.Netmask || '';
-            cell8.innerHTML = row.Broadcast || '';
-            cell9.innerHTML = row.Media || '';
+            for (let i = 0; i < fields.length; i++) {
+                let cell = newRow.insertCell(i);
+                let field = fields[i];
 
-            // Highlight changes
-            if (row.InterfaceChanged) cell1.classList.add('bg-warning');
-            if (row.FlagsChanged) cell2.classList.add('bg-warning');
-            if (row.OptionsChanged) cell3.classList.add('bg-warning');
-            if (row.MTUChanged) cell4.classList.add('bg-warning');
-            if (row.EtherChanged) cell5.classList.add('bg-warning');
-            if (row.InetChanged) cell6.classList.add('bg-warning');
-            if (row.NetmaskChanged) cell7.classList.add('bg-warning');
-            if (row.BroadcastChanged) cell8.classList.add('bg-warning');
-            if (row.MediaChanged) cell9.classList.add('bg-warning');
+                // Clear existing classes and tooltip
+                cell.className = '';
+                cell.title = '';
+                cell.removeAttribute('data-toggle');
+
+                cell.innerHTML = row[field] || '';
+                if (row[field + 'Changed']) {
+                    cell.classList.add('bg-warning');
+                    cell.title = 'Old value: ' + row[field + 'OldValue'];
+                    cell.dataset.toggle = "tooltip";
+                }
+            }
+
 
             // Highlight removals
             if (row.removed) {
@@ -45,6 +34,8 @@ function renderTableData(data) {
             }
         }
     });
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
 }
 
 // Function to fetch the data from the API and then render the table
@@ -53,6 +44,15 @@ function refreshTable() {
         .then(response => response.json())
         .then(data => {
             let currentData = data.data;
+
+            // Clean up oldData
+            oldData.forEach((row) => {
+                for (let key in row) {
+                    if (key.endsWith('Changed') || key.endsWith('OldValue')) {
+                        delete row[key];
+                    }
+                }
+            });
 
             // Convert oldData and currentData to Map for easy lookup
             let oldDataMap = new Map(oldData.map(i => [i.Interface, i]));
@@ -66,12 +66,14 @@ function refreshTable() {
                     for (const field in value) {
                         if (value[field] !== oldInterfaceData[field]) {
                             value[field + 'Changed'] = true;
+                            value[field + 'OldValue'] = oldInterfaceData[field];
                         }
                     }
                 } else {
                     // Interface is new, mark all fields as changed
                     for (const field in value) {
                         value[field + 'Changed'] = true;
+                        value[field + 'OldValue'] = '';
                     }
                 }
             });
@@ -87,18 +89,9 @@ function refreshTable() {
             // Render the table with the current data
             renderTableData(currentData);
 
-            // Update oldData for the next refresh, stripping 'Changed' and 'removed' properties
-            oldData = currentData.filter(interface => !interface.removed).map((interface) => {
-                let cleanInterface = {};
-                for (let key in interface) {
-                    if (!key.endsWith('Changed') && key !== 'removed') {
-                        cleanInterface[key] = interface[key];
-                    }
-                }
-                return cleanInterface;
-            });
+            // Store currentData to oldData for the next refresh, but filter out any removed interfaces
+            oldData = currentData.filter(interface => !interface.removed);
 
-            // Save the updated oldData to localStorage
             localStorage.setItem('oldData', JSON.stringify(oldData));
         })
         .catch(error => console.error('Error:', error));
