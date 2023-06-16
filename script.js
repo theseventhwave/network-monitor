@@ -1,5 +1,6 @@
 // Retrieve the old data from localStorage or initialize it as an empty array
 let oldData = JSON.parse(localStorage.getItem('oldData')) || [];
+let autoRefreshInterval = null;
 
 // Function to render the table
 function renderTableData(data) {
@@ -98,4 +99,31 @@ function refreshTable() {
 }
 
 // Fetch the data and render the table when the page loads
-window.onload = refreshTable;
+window.onload = function() {
+    refreshTable();
+
+    document.getElementById('refreshButton').addEventListener('click', function() {
+        refreshTable();
+    });
+
+    document.getElementById('autoRefreshCheckbox').addEventListener('change', function() {
+        if (this.checked) {
+            let delayInSeconds = document.getElementById('refreshDelay').value;
+            let delayInMilliseconds = delayInSeconds * 1000; // Convert to milliseconds
+            autoRefreshInterval = setInterval(refreshTable, delayInMilliseconds);
+        } else if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    });
+
+    document.getElementById('refreshDelay').addEventListener('change', function() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            let delayInSeconds = this.value;
+            let delayInMilliseconds = delayInSeconds * 1000; // Convert to milliseconds
+            autoRefreshInterval = setInterval(refreshTable, delayInMilliseconds);
+        }
+    });
+
+};
